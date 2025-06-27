@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Предсказание модели</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script>
+        function clearForm() {
+            document.getElementById('manualForm').reset();
+            const predictionElement = document.querySelector('h3');
+            if (predictionElement) predictionElement.remove();
+        }
+    </script>
+    <style>
+        select, input {
+            padding: 5px;
+            margin: 5px 0;
+        }
+        .form-group {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Ввод признаков вручную</h2>
+    <form action="/predict_manual" method="post" id="manualForm">
+        <!-- Числовые поля -->
+        <div class="form-group">
+            <label>age: <input type="number" name="age" required value="{{ data.get('age', '') }}"></label>
+        </div>
+        
+        <!-- Бинарные поля (Да/Нет) -->
+        {% for field in ['diabetes', 'family_history', 'obesity', 'alcohol_consumption', 
+                        'previous_heart_problems', 'medication_use'] %}
+        <div class="form-group">
+            <label>{{ field }}:
+                <select name="{{ field }}" required>
+                    <option value="1" {% if data.get(field) == 1 %}selected{% endif %}>Yes</option>
+                    <option value="0" {% if data.get(field) == 0 %}selected{% endif %}>No</option>
+                </select>
+            </label>
+        </div>
+        {% endfor %}
+        
+        <!-- Поле gender -->
+        <div class="form-group">
+            <label>gender:
+                <select name="gender" required>
+                    <option value="1" {% if data.get('gender') == 1 %}selected{% endif %}>Male</option>
+                    <option value="0" {% if data.get('gender') == 0 %}selected{% endif %}>Female</option>
+                </select>
+            </label>
+        </div>
+        
+        <!-- Множественный выбор для diet -->
+        <div class="form-group">
+            <label>diet:
+                <select name="diet" required>
+                    {% for value in [0, 1, 2] %}
+                    <option value="{{ value }}" {% if data.get('diet') == value %}selected{% endif %}>{{ value }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        </div>
+        
+        <!-- Множественный выбор для stress_level -->
+        <div class="form-group">
+            <label>stress_level:
+                <select name="stress_level" required>
+                    {% for value in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] %}
+                    <option value="{{ value }}" {% if data.get('stress_level') == value %}selected{% endif %}>{{ value }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        </div>
+        
+        <!-- Множественный выбор для physical_activity_days_per_week -->
+        <div class="form-group">
+            <label>physical_activity_days_per_week:
+                <select name="physical_activity_days_per_week" required>
+                    {% for value in [0, 1, 2, 3, 4, 5, 6, 7] %}
+                    <option value="{{ value }}" {% if data.get('physical_activity_days_per_week') == value %}selected{% endif %}>{{ value }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        </div>
+        
+        <!-- Остальные числовые поля -->
+        {% for field in ['cholesterol', 'heart_rate', 'sedentary_hours_per_day', 
+                        'income', 'bmi', 'triglycerides', 'sleep_hours_per_day', 
+                        'blood_sugar', 'ck_mb', 'troponin', 'systolic_blood_pressure', 
+                        'diastolic_blood_pressure', 'exercise_hours_per_week'] %}
+        <div class="form-group">
+            <label>{{ field }}: <input type="number" step="any" name="{{ field }}" required 
+                   value="{{ data.get(field, '') }}"></label>
+        </div>
+        {% endfor %}
+        
+        <button type="submit">Предсказать</button>
+        <button type="button" onclick="clearForm()">Очистить</button>
+    </form>
+
+    {% if prediction is not none %}
+        <h3>Предсказание: {{ prediction }}</h3>
+    {% endif %}
+
+    <hr>
+    <h2>Загрузка CSV-файла</h2>
+    <form action="/predict_csv" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".csv" required>
+        <button type="submit">Загрузить и предсказать</button>
+    </form>
+    {% if error %}
+    <div style="color: red; font-weight: bold;">{{ error }}</div>
+    {% endif %}
+    {% if table %}
+        <h3>Результаты</h3>
+        {{ table|safe }}
+    {% endif %}
+</body>
+</html>
