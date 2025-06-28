@@ -11,7 +11,7 @@ from fastapi.exceptions import RequestValidationError
 
 FEATURE_NAMES = [
     "age", "cholesterol", "heart_rate", "diabetes", "family_history",
-    "obesity", "alcohol_consumption", "exercise_hours_per_week", "diet",
+    "alcohol_consumption", "exercise_hours_per_week", "diet",
     "previous_heart_problems", "medication_use", "stress_level",
     "sedentary_hours_per_day", "income", "bmi", "triglycerides",
     "physical_activity_days_per_week", "sleep_hours_per_day", "blood_sugar",
@@ -32,7 +32,7 @@ model = Model(model_path=str(MODEL_FILE), threshold=0.425)
 async def form_page(request: Request):
     return templates.TemplateResponse("form.html", {
         "request": request,
-        "fields": FEATURE_NAMES,  # список всех полей
+        "fields": FEATURE_NAMES,  
         "data": {},
         "prediction": None
     })
@@ -43,25 +43,24 @@ async def predict_manual(
     age: float = Form(...),
     cholesterol: float = Form(...),
     heart_rate: float = Form(...),
-    diabetes: int = Form(...),  # Изменено на int
-    family_history: int = Form(...),  # Изменено на int
-    obesity: int = Form(...),  # Изменено на int
-    alcohol_consumption: int = Form(...),  # Изменено на int
+    diabetes: int = Form(...),  
+    family_history: int = Form(...),  
+    alcohol_consumption: int = Form(...),  
     exercise_hours_per_week: float = Form(...),
-    diet: int = Form(...),  # Новый тип
-    previous_heart_problems: int = Form(...),  # Изменено на int
-    medication_use: int = Form(...),  # Изменено на int
-    stress_level: int = Form(...),  # Новый тип
+    diet: int = Form(...),  
+    previous_heart_problems: int = Form(...),  
+    medication_use: int = Form(...),  
+    stress_level: int = Form(...),  
     sedentary_hours_per_day: float = Form(...),
     income: float = Form(...),
     bmi: float = Form(...),
     triglycerides: float = Form(...),
-    physical_activity_days_per_week: int = Form(...),  # Новый тип
+    physical_activity_days_per_week: int = Form(...),  
     sleep_hours_per_day: float = Form(...),
     blood_sugar: float = Form(...),
     ck_mb: float = Form(...),
     troponin: float = Form(...),
-    gender: int = Form(...),  # Изменено на int
+    gender: int = Form(...),  
     systolic_blood_pressure: float = Form(...),
     diastolic_blood_pressure: float = Form(...)
 ):
@@ -71,7 +70,6 @@ async def predict_manual(
         "heart_rate": heart_rate,
         "diabetes": diabetes,
         "family_history": family_history,
-        "obesity": obesity,
         "alcohol_consumption": alcohol_consumption,
         "exercise_hours_per_week": exercise_hours_per_week,
         "diet": diet,
@@ -93,19 +91,18 @@ async def predict_manual(
     }
     df = pd.DataFrame([input_data])
     prediction = model.predict(df)[0]
-    
+
     return templates.TemplateResponse(
         "form.html",
         {
             "request": request,
             "prediction": prediction,
-            "data": input_data  # передаём введённые значения обратно в шаблон
+            "data": input_data  
         }
     )
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    # Можно просто перерисовать страницу с пустыми полями и сообщением
     return templates.TemplateResponse(
         "form.html",
         {
@@ -114,14 +111,60 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "data": {},
             "error": "Некорректные или пустые данные. Пожалуйста, заполните все поля."
         },
-        status_code=200  # важно: иначе браузер может закешировать ошибку
+        status_code=200 
     )
+
+
+import re
+
 
 
 @app.post("/predict_csv", response_class=HTMLResponse)
 async def predict_csv(request: Request, file: UploadFile = File(...)):
-    df = pd.read_csv(file.file)
-    predictions = model.predict(df)
-    df["Prediction"] = predictions
-    result_html = df.to_html(classes="table", index=False)
-    return templates.TemplateResponse("form.html", {"request": request, "table": result_html})
+    try:
+        df = pd.read_csv(file.file)
+
+        df.columns = df.columns.str.lower().str.replace(r'[\s\-\.]+', '_', regex=True)
+
+        if 'gender' in df.columns:
+            df['gender'] = df['gender'].str.lower().map({'male': 1, 'female': 0})
+
+        df = df[[col for col in df.columns if col in FEATURE_NAMES]]
+
+        missing = [feat for feat in FEATURE_NAMES if feat not in df.columns]
+        if missing:
+            return templates.TemplateResponse(
+                "form.html",
+                {
+                    "request": request,
+                    "prediction": None,
+                    "data": {},
+                    "error": f"В файле не хватает признаков: {', '.join(missing)}"
+                },
+                status_code=200
+            )
+
+        df = df[FEATURE_NAMES]
+        predictions = model.predict(df)
+        df["prediction"] = predictions
+
+        result_html = df.to_html(classes="table", index=False)
+
+        return templates.TemplateResponse("form.html", {
+            "request": request,
+            "table": result_html,
+            "data": {},
+            "prediction": None
+        })
+
+    except Exception as e:
+        return templates.TemplateResponse(
+            "form.html",
+            {
+                "request": request,
+                "error": f"Ошибка при обработке файла: {str(e)}",
+                "data": {},
+                "prediction": None
+            },
+            status_code=200
+        )
